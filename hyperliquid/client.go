@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Mikelle/hltools/retry"
+	"github.com/Mikelle/tradekit/retry"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"

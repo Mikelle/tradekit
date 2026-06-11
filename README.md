@@ -1,4 +1,4 @@
-# hltools
+# tradekit
 
 Production-hardened Go building blocks for trading bots on [Hyperliquid](https://hyperliquid.xyz), extracted from a live delta-neutral bot.
 
@@ -27,7 +27,7 @@ Telegram notifier with a critical-priority queue: routine messages are best-effo
 ## Install
 
 ```sh
-go get github.com/Mikelle/hltools@latest
+go get github.com/Mikelle/tradekit@latest
 ```
 
 ## Stability

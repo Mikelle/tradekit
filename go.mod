@@ -1,4 +1,4 @@
-module github.com/Mikelle/hltools
+module github.com/Mikelle/tradekit
 
 go 1.25.3
 
