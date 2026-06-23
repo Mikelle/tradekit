@@ -511,6 +511,37 @@ func (c *Client) GetAccountValue(ctx context.Context) (decimal.Decimal, error) {
 	return decimalFromStr(state.MarginSummary.AccountValue), nil
 }
 
+// GetSpotUSDC returns the account's spot USDC balance: total holdings and the
+// portion held as margin for open positions (free = total − hold). This is the
+// account's real cash on HL — on a builder-code dex the perp collateral is
+// carried as held spot USDC, so GetAccountValue (the dex-scoped margin slice,
+// ≈ hold) drastically understates what's actually on the account. The spot
+// state is account-global, so this is account-scoped (identical across pairs)
+// and the request must NOT carry the dex param — hence postInfoRetry directly
+// rather than fetchInfo, which would inject c.dex.
+func (c *Client) GetSpotUSDC(ctx context.Context) (total, hold decimal.Decimal, err error) {
+	var resp struct {
+		Balances []struct {
+			Coin  string `json:"coin"`
+			Total string `json:"total"`
+			Hold  string `json:"hold"`
+		} `json:"balances"`
+	}
+	if err := c.postInfoRetry(ctx, map[string]any{
+		"type": "spotClearinghouseState",
+		"user": c.acct.accountAddr,
+	}, &resp); err != nil {
+		return decimal.Zero, decimal.Zero, fmt.Errorf("fetch spot clearinghouse state: %w", err)
+	}
+	for _, b := range resp.Balances {
+		if b.Coin == "USDC" {
+			return decimalFromStr(b.Total), decimalFromStr(b.Hold), nil
+		}
+	}
+	// No USDC balance entry — account holds no spot USDC.
+	return decimal.Zero, decimal.Zero, nil
+}
+
 // GetPerpCapitalChangeSince returns the net USD capital moved into the perp
 // account since the given timestamp via accountClassTransfer events
 // (spot↔perp). Positive = net inflow; negative = net outflow.

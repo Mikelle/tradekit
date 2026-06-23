@@ -98,6 +98,58 @@ func TestGetHistoricalAccountValue_PicksClosest(t *testing.T) {
 	}
 }
 
+// TestGetSpotUSDC_PicksUSDCBalance confirms we return the USDC entry's total
+// and hold, ignoring other coins, and that the request is account-global (no
+// dex param) — the spot ledger is not dex-scoped.
+func TestGetSpotUSDC_PicksUSDCBalance(t *testing.T) {
+	ctx := context.Background()
+	var sawDex bool
+	c := newTestClient(t, infoHandler(t, map[string]http.HandlerFunc{
+		"spotClearinghouseState": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			var b map[string]any
+			_ = json.Unmarshal(body, &b)
+			if _, ok := b["dex"]; ok {
+				sawDex = true
+			}
+			_, _ = w.Write([]byte(`{"balances":[
+				{"coin":"HYPE","total":"0.30","hold":"0.0"},
+				{"coin":"USDC","total":"7833.58","hold":"1412.95"}
+			]}`))
+		},
+	}))
+	total, hold, err := c.GetSpotUSDC(ctx)
+	if err != nil {
+		t.Fatalf("GetSpotUSDC: %v", err)
+	}
+	if total.String() != "7833.58" {
+		t.Errorf("total = %s, want 7833.58", total)
+	}
+	if hold.String() != "1412.95" {
+		t.Errorf("hold = %s, want 1412.95", hold)
+	}
+	if sawDex {
+		t.Error("spotClearinghouseState must not carry the dex param")
+	}
+}
+
+// TestGetSpotUSDC_NoUSDCEntry returns zero when the account holds no spot USDC.
+func TestGetSpotUSDC_NoUSDCEntry(t *testing.T) {
+	ctx := context.Background()
+	c := newTestClient(t, infoHandler(t, map[string]http.HandlerFunc{
+		"spotClearinghouseState": func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"balances":[{"coin":"HYPE","total":"0.30","hold":"0.0"}]}`))
+		},
+	}))
+	total, hold, err := c.GetSpotUSDC(ctx)
+	if err != nil {
+		t.Fatalf("GetSpotUSDC: %v", err)
+	}
+	if !total.IsZero() || !hold.IsZero() {
+		t.Errorf("got total=%s hold=%s, want 0/0", total, hold)
+	}
+}
+
 // TestGetPerpCapitalChangeSince_SumsAccountClassTransfers sums deposits/
 // withdrawals into/out of perp via accountClassTransfer, signed by toPerp.
 func TestGetPerpCapitalChangeSince_SumsAccountClassTransfers(t *testing.T) {
